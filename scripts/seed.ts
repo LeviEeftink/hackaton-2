@@ -1,18 +1,19 @@
 import 'dotenv/config'
 
-import { getPayload } from 'payload'
+import type { SQLiteAdapter } from '@payloadcms/db-sqlite'
+import { pathToFileURL } from 'node:url'
+import { getPayload, type CollectionSlug, type Payload } from 'payload'
 
 import config from '../src/payload.config'
 
 type Identifier = number
 
-const findOne = async (payload: Awaited<ReturnType<typeof getPayload>>, collection: string, field: string, value: string) => {
-  const result = await payload.find({ collection: collection as never, where: { [field]: { equals: value } }, limit: 1, depth: 0, overrideAccess: true })
+const findOne = async (payload: Payload, collection: CollectionSlug, field: string, value: string) => {
+  const result = await payload.find({ collection, where: { [field]: { equals: value } }, limit: 1, depth: 0, overrideAccess: true })
   return result.docs[0] as { id: Identifier } | undefined
 }
 
-const main = async () => {
-  const payload = await getPayload({ config })
+export const seedDemoData = async (payload: Payload) => {
   const password = 'HitchTrackerDemo2026!'
 
   const ensureUser = async (name: string, email: string, role: 'passenger' | 'driver' | 'operator' | 'admin') => {
@@ -105,10 +106,10 @@ const main = async () => {
     },
   ]
 
-  let route = await findOne(payload, 'routes', 'name', 'Amsterdam Centraal naar Museumplein')
-  if (!route) {
-    for (const demoRoute of demoRoutes) {
-      const created = await payload.create({
+  for (const demoRoute of demoRoutes) {
+    let route = await findOne(payload, 'routes', 'name', demoRoute.name)
+    if (!route) {
+      route = await payload.create({
         collection: 'routes',
         data: {
           name: demoRoute.name,
@@ -120,24 +121,55 @@ const main = async () => {
         },
         overrideAccess: true,
       }) as { id: Identifier }
-      for (const point of demoRoute.points) {
-        await payload.create({ collection: 'route-points', data: { route: created.id, ...point }, overrideAccess: true })
+    }
+    for (const point of demoRoute.points) {
+      const existingPoint = await payload.find({
+        collection: 'route-points',
+        where: { and: [{ route: { equals: route.id } }, { sequence: { equals: point.sequence } }] },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      if (!existingPoint.docs[0]) {
+        await payload.create({ collection: 'route-points', data: { route: route.id, ...point }, overrideAccess: true })
       }
     }
-    route = await findOne(payload, 'routes', 'name', 'Amsterdam Centraal naar Museumplein')
+    if (!await findOne(payload, 'destinations', 'name', demoRoute.destinationLabel)) {
+      await payload.create({
+        collection: 'destinations',
+        data: { name: demoRoute.destinationLabel, isActive: true },
+        overrideAccess: true,
+      })
+    }
   }
 
-  console.log('Seed voltooid.')
-  console.table([
-    { rol: 'admin', email: 'admin@hitchtracker.test', wachtwoord: password },
-    { rol: 'passenger', email: 'passenger@hitchtracker.test', wachtwoord: password },
-    { rol: 'driver', email: 'driver@hitchtracker.test', wachtwoord: password },
-    { rol: 'operator', email: 'operator@hitchtracker.test', wachtwoord: password },
-  ])
-  console.log(`Demo route id: ${route?.id}; tarief id: ${tariff.id}; voertuig id: ${vehicle.id}; admin id: ${admin.id}; passagier id: ${passenger.id}`)
+  const route = await findOne(payload, 'routes', 'name', 'Amsterdam Centraal naar Museumplein')
+  return { admin, passenger, driver, tariff, vehicle, route }
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exitCode = 1
-})
+const main = async () => {
+  const payload = await getPayload({ config })
+  try {
+    const { admin, passenger, tariff, vehicle, route } = await seedDemoData(payload)
+    const password = 'HitchTrackerDemo2026!'
+    console.log('Seed voltooid.')
+    console.table([
+      { rol: 'admin', email: 'admin@hitchtracker.test', wachtwoord: password },
+      { rol: 'passenger', email: 'passenger@hitchtracker.test', wachtwoord: password },
+      { rol: 'driver', email: 'driver@hitchtracker.test', wachtwoord: password },
+      { rol: 'operator', email: 'operator@hitchtracker.test', wachtwoord: password },
+    ])
+    console.log(`Demo route id: ${route?.id}; tarief id: ${tariff.id}; voertuig id: ${vehicle.id}; admin id: ${admin.id}; passagier id: ${passenger.id}`)
+  } finally {
+    const client = (payload.db as unknown as SQLiteAdapter).client
+    await payload.destroy()
+    client.close()
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+}

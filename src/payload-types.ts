@@ -72,6 +72,7 @@ export interface Config {
     routes: Route;
     'route-points': RoutePoint;
     vehicles: Vehicle;
+    destinations: Destination;
     rides: Ride;
     'ride-events': RideEvent;
     'audit-logs': AuditLog;
@@ -106,6 +107,7 @@ export interface Config {
     routes: RoutesSelect<false> | RoutesSelect<true>;
     'route-points': RoutePointsSelect<false> | RoutePointsSelect<true>;
     vehicles: VehiclesSelect<false> | VehiclesSelect<true>;
+    destinations: DestinationsSelect<false> | DestinationsSelect<true>;
     rides: RidesSelect<false> | RidesSelect<true>;
     'ride-events': RideEventsSelect<false> | RideEventsSelect<true>;
     'audit-logs': AuditLogsSelect<false> | AuditLogsSelect<true>;
@@ -379,6 +381,17 @@ export interface AuditLog {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "destinations".
+ */
+export interface Destination {
+  id: number;
+  name: string;
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -420,6 +433,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'vehicles';
         value: number | Vehicle;
+      } | null)
+    | ({
+        relationTo: 'destinations';
+        value: number | Destination;
       } | null)
     | ({
         relationTo: 'rides';
@@ -562,6 +579,16 @@ export interface VehiclesSelect<T extends boolean = true> {
   isActive?: T;
   currentDriver?: T;
   rides?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "destinations_select".
+ */
+export interface DestinationsSelect<T extends boolean = true> {
+  name?: T;
+  isActive?: T;
   updatedAt?: T;
   createdAt?: T;
 }
