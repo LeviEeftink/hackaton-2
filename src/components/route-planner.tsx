@@ -14,6 +14,23 @@ export function RoutePlanner() {
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [activeRide, setActiveRide] = useState<number | null>(null)
+  const [favorites, setFavorites] = useState<number[]>([])
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [storageReady, setStorageReady] = useState(false)
+  const favoriteKey = `hitchtracker-favorites-${user?.id ?? 'guest'}`
+  useEffect(() => {
+    setStorageReady(false)
+    try {
+      const value: unknown = JSON.parse(localStorage.getItem(favoriteKey) || '[]')
+      setFavorites(Array.isArray(value) ? value.filter((id): id is number => Number.isSafeInteger(id) && id > 0) : [])
+    } catch { setFavorites([]) }
+    setStorageReady(true)
+  }, [favoriteKey])
+  function toggleFavorite(id: number) {
+    const next = favorites.includes(id) ? favorites.filter(value => value !== id) : [...favorites, id]
+    setFavorites(next)
+    try { localStorage.setItem(favoriteKey, JSON.stringify(next)) } catch { /* Browsers may disable local storage. */ }
+  }
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true); setError('')
@@ -31,7 +48,7 @@ export function RoutePlanner() {
       .then(({ docs }) => setActiveRide(docs[0]?.id ?? null)).catch(() => {})
     return () => controller.abort()
   }, [user])
-  const visible = routes.filter(route => `${route.pickupLabel} ${route.destinationLabel}`.toLocaleLowerCase('nl').includes(search.toLocaleLowerCase('nl')))
+  const visible = routes.filter(route => (!favoritesOnly || favorites.includes(route.id)) && `${route.pickupLabel} ${route.destinationLabel}`.toLocaleLowerCase('nl').includes(search.toLocaleLowerCase('nl')))
   const selectedRoute = visible.find(route => route.id === selected)
   return <main className="screen">
     <Steps current={1} /><p className="eyebrow">Op weg, met overzicht</p>
@@ -39,14 +56,17 @@ export function RoutePlanner() {
     {activeRide && <p className="notice success">Je hebt een actieve rit. <Link href={`/rit?id=${activeRide}`}>Verder met volgen →</Link></p>}
     <div className="grid"><section>
       <label className="field"><span className="field-label">Zoek vertrek of bestemming</span><input className="field-value" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Bijvoorbeeld Museumplein of Schiphol" /></label>
+      <div className="chips" style={{ marginTop: 14 }}><button className={`chip ${!favoritesOnly ? 'selected' : ''}`} onClick={() => setFavoritesOnly(false)}>Alle routes</button><button className={`chip ${favoritesOnly ? 'selected' : ''}`} onClick={() => setFavoritesOnly(true)}>★ Favorieten ({favorites.length})</button></div>
       {loading && <p role="status" className="notice">Routes laden…</p>}
       {error && <div className="notice error" role="alert">{error} <button className="text-button" onClick={() => setAttempt(attempt + 1)}>Opnieuw proberen</button></div>}
       <div className="route-results">{visible.map(route => <div key={route.id} className={`route-option ${selected === route.id ? 'selected' : ''}`}>
         <button className="route-select" onClick={() => setSelected(route.id)} aria-pressed={selected === route.id}>
           <span className="route-dot" aria-hidden="true" /><span><strong>{route.destinationLabel}</strong><small>Vanaf {route.pickupLabel}</small><small>{distance(route.totalDistanceMeters)} · {minutes(route.estimatedDurationSeconds)}</small></span>
         </button>
+        <button className={`favorite ${favorites.includes(route.id) ? 'saved' : ''}`} disabled={!storageReady} onClick={() => toggleFavorite(route.id)} aria-label={`${route.destinationLabel} ${favorites.includes(route.id) ? 'verwijderen uit' : 'toevoegen aan'} favorieten`} aria-pressed={favorites.includes(route.id)}>{favorites.includes(route.id) ? '★' : '☆'}</button>
       </div>)}</div>
-      {!loading && !error && visible.length === 0 && <p className="empty">{routes.length ? 'Geen route gevonden. Probeer een andere zoekterm.' : 'Er zijn nog geen routes beschikbaar.'}</p>}
+      {!loading && !error && visible.length === 0 && <p className="empty">{favoritesOnly ? 'Nog geen passende favorieten. Bewaar een route met het sterretje.' : routes.length ? 'Geen route gevonden. Probeer een andere zoekterm.' : 'Er zijn nog geen routes beschikbaar.'}</p>}
+      <p className="muted">Je favorieten worden in deze browser bewaard.</p>
     </section><aside className="panel tinted stack">
       <p className="eyebrow">Goed om te weten</p><h2>Een helder begin.<br />Een transparante rit.</h2>
       <p className="muted">Je prijs komt uit het actuele tarief. Tijdens je rit zie je hoeveel je hebt gereden en wat de rit kost.</p>
