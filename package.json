@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
     "build": "cross-env NODE_OPTIONS=--no-deprecation next build",
-    "start": "cross-env NODE_OPTIONS=--no-deprecation node .next/standalone/server.js",
+    "start": "cross-env NODE_OPTIONS=--no-deprecation node scripts/start.mjs",
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed.ts",
@@ -15,7 +15,9 @@
     "test:backend": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/backend.spec.ts",
     "test:lifecycle": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/lifecycle.spec.ts",
     "test:history": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/history.spec.ts",
-    "test": "npm run test:backend && npm run test:lifecycle && npm run test:history && npm run test:integration",
+    "test:api": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/api.integration.ts",
+    "test:client": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/client.spec.ts",
+    "test": "npm run test:backend && npm run test:lifecycle && npm run test:history && npm run test:client && npm run test:integration",
     "test:integration": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/seed.integration.ts"
   },
   "dependencies": {
@@ -38,6 +40,6 @@
     "typescript": "5.7.3"
   },
   "engines": {
-    "node": "^18.20.2 || >=20.9.0"
+    "node": ">=20.9.0"
   }
 }
