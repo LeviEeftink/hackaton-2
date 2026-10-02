@@ -14,6 +14,7 @@ export function Quote({ routeId }: { routeId: number }) {
   const [busy, setBusy] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const key = useRef<string | null>(null)
+  const starting = useRef(false)
   useEffect(() => {
     const controller = new AbortController()
     setQuote(null); setError('')
@@ -23,12 +24,13 @@ export function Quote({ routeId }: { routeId: number }) {
     return () => controller.abort()
   }, [routeId, attempt])
   async function start() {
-    if (busy) return
+    if (starting.current) return
+    starting.current = true
     setBusy(true); setError(''); key.current ??= crypto.randomUUID()
     try {
       const result = await api<{ ride: { id: number } }>('/api/rides/start', { method: 'POST', body: JSON.stringify({ routeId, idempotencyKey: key.current }) })
       router.push(`/rit?id=${result.ride.id}`)
-    } catch (e) { setError((e as Error).message); setBusy(false) }
+    } catch (e) { setError((e as Error).message); setBusy(false); starting.current = false }
   }
   return <main className="screen"><Steps current={2} /><Link className="back" href="/">← Andere route kiezen</Link>
     <p className="eyebrow">Jouw ritvoorstel</p><h1 className="title">Weet waar je aan toe bent.</h1>

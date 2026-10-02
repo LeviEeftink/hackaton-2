@@ -5,14 +5,15 @@ import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
 import { useSession } from './session'
 import { api } from '@/lib/client-api'
+import { safeReturnPath } from '@/domain/navigation'
 
-export function Account({ next }: { next: string }) {
+export function Account({ next }: { next: string | string[] }) {
   const { user, refresh } = useSession()
   const router = useRouter()
   const [register, setRegister] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const destination = next.startsWith('/') && !next.startsWith('//') ? next : '/'
+  const destination = safeReturnPath(next)
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); setBusy(true)
     const form = new FormData(event.currentTarget)

@@ -13,7 +13,8 @@ export function RoutePlanner() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
-  const [activeRide, setActiveRide] = useState<number | null>(null)
+  const [activeRideResult, setActiveRide] = useState<{ userId: number; id: number } | null>(null)
+  const activeRide = user && activeRideResult?.userId === user.id ? activeRideResult.id : null
   const [favorites, setFavorites] = useState<number[]>([])
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [storageReady, setStorageReady] = useState(false)
@@ -45,7 +46,7 @@ export function RoutePlanner() {
     if (!user || user.role !== 'passenger') return
     const controller = new AbortController()
     api<{ docs: { id: number }[] }>(`/api/rides?where[status][equals]=active&where[passenger][equals]=${user.id}&limit=1&depth=0&sort=-createdAt`, { signal: controller.signal })
-      .then(({ docs }) => setActiveRide(docs[0]?.id ?? null)).catch(() => {})
+      .then(({ docs }) => { if (!controller.signal.aborted) setActiveRide(docs[0] ? { userId: user.id, id: docs[0].id } : null) }).catch(() => {})
     return () => controller.abort()
   }, [user])
   const visible = routes.filter(route => (!favoritesOnly || favorites.includes(route.id)) && `${route.pickupLabel} ${route.destinationLabel}`.toLocaleLowerCase('nl').includes(search.toLocaleLowerCase('nl')))

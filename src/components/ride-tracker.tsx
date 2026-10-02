@@ -9,7 +9,9 @@ import { Steps, useSession } from './session'
 export function RideTracker({ rideId }: { rideId: number }) {
   const { user, loading } = useSession()
   const router = useRouter()
-  const [tracking, setTracking] = useState<Tracking | null>(null)
+  const [result, setResult] = useState<{ key: string; data: Tracking } | null>(null)
+  const requestKey = `${user?.id ?? 'guest'}:${rideId}`
+  const tracking = user && result?.key === requestKey ? result.data : null
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -17,6 +19,7 @@ export function RideTracker({ rideId }: { rideId: number }) {
   const [reason, setReason] = useState('')
   const actionKeys = useRef<Record<string, string>>({})
   const inFlight = useRef(false)
+  useEffect(() => { setCancelOpen(false); setReason(''); actionKeys.current = {} }, [requestKey])
   useEffect(() => {
     if (!user || !Number.isSafeInteger(rideId) || rideId <= 0) return
     const controller = new AbortController()
@@ -27,7 +30,7 @@ export function RideTracker({ rideId }: { rideId: number }) {
       try {
         const result = await api<Tracking>(`/api/rides/${rideId}/tracking`, { signal: controller.signal })
         if (controller.signal.aborted) return
-        setTracking(result); setError('')
+        setResult({ key: requestKey, data: result }); setError('')
         if (result.ride.status === 'completed' || result.ride.status === 'cancelled') router.replace(`/eind?id=${rideId}`)
       } catch (e) { if (!controller.signal.aborted) setError((e as Error).message) }
       finally { running = false }
@@ -35,12 +38,12 @@ export function RideTracker({ rideId }: { rideId: number }) {
     void load()
     const timer = setInterval(() => { if (document.visibilityState === 'visible') void load() }, 5000)
     return () => { controller.abort(); clearInterval(timer) }
-  }, [user, rideId, refresh, router])
+  }, [user, rideId, refresh, router, requestKey])
   const ride = tracking?.ride
   const nextPoint = tracking?.routePoints.find(point => !point.passed)
   const canOperate = user && ['driver', 'operator', 'admin'].includes(user.role)
   async function act(action: 'advance' | 'complete' | 'cancel') {
-    if (inFlight.current) return
+    if (inFlight.current || !tracking || !user || ride?.status !== 'active' || (action === 'advance' && !nextPoint)) return
     inFlight.current = true; setBusy(true); setError('')
     const operation = `${action}-${action === 'advance' ? nextPoint?.id : rideId}`
     actionKeys.current[operation] ??= crypto.randomUUID()
