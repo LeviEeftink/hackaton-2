@@ -1,0 +1,40 @@
+{
+  "name": "hitchtracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "HitchTracker backend met Next.js, Payload CMS en SQLite.",
+  "scripts": {
+    "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
+    "build": "cross-env NODE_OPTIONS=--no-deprecation next build",
+    "start": "cross-env NODE_OPTIONS=--no-deprecation node .next/standalone/server.js",
+    "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
+    "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
+    "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed.ts",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:backend": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/backend.spec.ts",
+    "test:integration": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/seed.integration.ts"
+  },
+  "dependencies": {
+    "@payloadcms/db-sqlite": "3.88.0",
+    "@payloadcms/next": "3.88.0",
+    "@payloadcms/richtext-lexical": "3.88.0",
+    "cross-env": "^7.0.3",
+    "dotenv": "16.4.7",
+    "next": "16.3.3",
+    "payload": "3.88.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "sharp": "0.34.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.9",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.6",
+    "tsx": "4.22.4",
+    "typescript": "5.7.3"
+  },
+  "engines": {
+    "node": "^18.20.2 || >=20.9.0"
+  }
+}
