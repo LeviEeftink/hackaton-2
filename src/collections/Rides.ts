@@ -3,6 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { adminsOnly, isOperator, operatorsOnly, relationID, rideEventReadAccess, rideReadAccess, type HitchUser } from '@/access/roles'
 import { validStatusTransition, type RideStatus } from '@/domain/ride'
 import { rideEndpoints } from '@/endpoints/rides'
+import { historyEndpoints } from '@/endpoints/history'
 
 const positiveInteger = (label: string) => (value: number | null | undefined) =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 ? true : `${label} moet een niet-negatief geheel getal zijn.`
@@ -22,7 +23,7 @@ export const Rides: CollectionConfig = {
     update: operatorsOnly,
     delete: adminsOnly,
   },
-  endpoints: rideEndpoints,
+  endpoints: [...historyEndpoints, ...rideEndpoints],
   fields: [
     { name: 'reference', type: 'text', label: 'Ritnummer', required: true, unique: true, index: true, maxLength: 40 },
     { name: 'startRequestId', type: 'text', label: 'Start-idempotentiesleutel', unique: true, index: true, maxLength: 100, admin: { readOnly: true } },
