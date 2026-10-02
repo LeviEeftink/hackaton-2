@@ -16,8 +16,8 @@ export const viewport: Viewport = {
 
 export default function FrontendLayout({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
+    <html lang="nl"><body><SessionProvider>
       <div className="phone"><Navigation />{children}<footer className="app-footer">HitchTracker · Transparant van vertrek tot aankomst</footer></div>
-    </SessionProvider>
+    </SessionProvider></body></html>
   )
 }
