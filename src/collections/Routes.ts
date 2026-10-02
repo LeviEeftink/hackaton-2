@@ -4,7 +4,10 @@ import { adminsOnly, isOperator, operatorsOnly, relationID, type HitchUser } fro
 import { quoteEndpoint } from '@/endpoints/rides'
 
 const wholePositiveNumber = (label: string) => (value: number | null | undefined) =>
-  typeof value === 'number' && Number.isInteger(value) && value > 0 ? true : `${label} moet een positief geheel getal zijn.`
+  typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? true : `${label} moet een veilig positief geheel getal zijn.`
+
+const wholeNonNegativeNumber = (label: string) => (value: number | null | undefined) =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? true : `${label} moet een veilig niet-negatief geheel getal zijn.`
 
 export const Routes: CollectionConfig = {
   slug: 'routes',
@@ -88,18 +91,19 @@ export const RoutePoints: CollectionConfig = {
     { name: 'label', type: 'text', label: 'Label', required: true, maxLength: 100 },
     { name: 'latitude', type: 'number', label: 'Breedtegraad', required: true, min: -90, max: 90 },
     { name: 'longitude', type: 'number', label: 'Lengtegraad', required: true, min: -180, max: 180 },
-    { name: 'distanceFromStartMeters', type: 'number', label: 'Afstand vanaf start in meters', required: true, min: 0 },
+    { name: 'distanceFromStartMeters', type: 'number', label: 'Afstand vanaf start in meters', required: true, min: 0, validate: wholeNonNegativeNumber('Afstand vanaf start') },
   ],
   hooks: {
     beforeValidate: [
       async ({ data, originalDoc, req }) => {
         if (!data) return data
         if (typeof data.label === 'string') data.label = data.label.trim().replace(/\s+/g, ' ')
-        const route = relationID(data.route)
-        if (route === undefined || typeof data.sequence !== 'number') return data
+        const route = relationID(data.route ?? originalDoc?.route)
+        const sequence = data.sequence ?? originalDoc?.sequence
+        if (route === undefined || typeof sequence !== 'number') return data
         const duplicates = await req.payload.find({
           collection: 'route-points',
-          where: { and: [{ route: { equals: route } }, { sequence: { equals: data.sequence } }] },
+          where: { and: [{ route: { equals: route } }, { sequence: { equals: sequence } }] },
           limit: 2,
           overrideAccess: true,
           req,
@@ -112,14 +116,36 @@ export const RoutePoints: CollectionConfig = {
       },
     ],
     beforeChange: [
-      async ({ data, req }) => {
+      async ({ data, originalDoc, req }) => {
         if (!data) return data
-        const routeID = relationID(data.route)
-        if (routeID === undefined || typeof data.distanceFromStartMeters !== 'number') return data
+        const routeID = relationID(data.route ?? originalDoc?.route)
+        const distance = data.distanceFromStartMeters ?? originalDoc?.distanceFromStartMeters
+        const sequence = data.sequence ?? originalDoc?.sequence
+        if (routeID === undefined || typeof distance !== 'number' || typeof sequence !== 'number') return data
         const route = await req.payload.findByID({ collection: 'routes', id: routeID, depth: 0, overrideAccess: true, req })
-        if (data.distanceFromStartMeters > route.totalDistanceMeters) {
+        if (distance > route.totalDistanceMeters) {
           throw new Error('Een routepunt kan niet verder liggen dan de totale routeafstand.')
         }
+        const neighbors = await req.payload.find({
+          collection: 'route-points',
+          where: {
+            and: [
+              { route: { equals: routeID } },
+              ...(originalDoc?.id ? [{ id: { not_equals: originalDoc.id } }] : []),
+              {
+                or: [
+                  { and: [{ sequence: { less_than: sequence } }, { distanceFromStartMeters: { greater_than: distance } }] },
+                  { and: [{ sequence: { greater_than: sequence } }, { distanceFromStartMeters: { less_than: distance } }] },
+                ],
+              },
+            ],
+          },
+          limit: 1,
+          depth: 0,
+          overrideAccess: true,
+          req,
+        })
+        if (neighbors.docs.length > 0) throw new Error('De afstand van routepunten mag niet teruglopen in de routevolgorde.')
         return data
       },
     ],

@@ -13,6 +13,7 @@
     "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/seed.ts",
     "typecheck": "tsc --noEmit --incremental false",
     "test:backend": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/backend.spec.ts",
+    "test:lifecycle": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/lifecycle.spec.ts",
     "test:integration": "cross-env NODE_OPTIONS=--no-deprecation tsx tests/seed.integration.ts"
   },
   "dependencies": {

@@ -77,9 +77,9 @@ const jsonObject = async (req: PayloadRequest): Promise<Record<string, unknown>>
 }
 
 const identifier = (value: unknown, name: string): Identifier => {
-  if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) return Number(value)
-  throw new APIError(`${name} is verplicht.`, 400)
+  const parsed = typeof value === 'string' && /^\d+$/.test(value.trim()) ? Number(value.trim()) : value
+  if (typeof parsed === 'number' && Number.isSafeInteger(parsed) && parsed > 0) return parsed
+  throw new APIError(`${name} moet een veilig positief geheel getal zijn.`, 400)
 }
 
 const relationNumber = (value: RelationshipValue, name: string): number => identifier(relationID(value), name)
@@ -182,7 +182,12 @@ const createAudit = async (
   })
 }
 
-const existingEvent = async (req: PayloadRequest, key: string) => {
+const existingEvent = async (
+  req: PayloadRequest,
+  key: string,
+  ride: RideData,
+  kind: 'progress' | 'completed' | 'cancelled',
+): Promise<boolean> => {
   const result = await req.payload.find({
     collection: 'ride-events',
     where: { idempotencyKey: { equals: key } },
@@ -191,7 +196,12 @@ const existingEvent = async (req: PayloadRequest, key: string) => {
     overrideAccess: true,
     req,
   })
-  return result.docs[0]
+  const event = result.docs[0]
+  if (!event) return false
+  if (String(relationID(event.ride)) !== String(ride.id) || event.kind !== kind) {
+    throw new APIError('Deze idempotentiesleutel is al voor een andere rit of actie gebruikt.', 409)
+  }
+  return true
 }
 
 const trackingResponse = (ride: RideData, points: RoutePointData[]) => ({
@@ -320,30 +330,40 @@ const advanceRide = {
     const user = currentUser(req)
     const ride = await ownRide(req, identifier(req.routeParams?.id, 'Rit-id'))
     if (!canOperateRide(user, ride)) throw new APIError('Alleen de toegewezen chauffeur of een medewerker mag voortgang bijwerken.', 403)
-    if (ride.status !== 'active') throw new APIError('Alleen een actieve rit kan voortgang ontvangen.', 409)
     const body = await jsonObject(req)
     const eventKey = idempotencyKey(body.idempotencyKey)
-    if (await existingEvent(req, eventKey)) return Response.json({ ride, idempotent: true })
-    const point = asRoutePoint(await req.payload.findByID({
-      collection: 'route-points',
-      id: identifier(body.routePointId, 'routePointId'),
-      depth: 0,
-      overrideAccess: true,
-      req,
-    }))
+    if (await existingEvent(req, eventKey, ride, 'progress')) return Response.json({ ride, idempotent: true })
+    if (ride.status !== 'active') throw new APIError('Alleen een actieve rit kan voortgang ontvangen.', 409)
+    const pointID = identifier(body.routePointId, 'routePointId')
+    let point: RoutePointData
+    try {
+      point = asRoutePoint(await req.payload.findByID({
+        collection: 'route-points',
+        id: pointID,
+        depth: 0,
+        overrideAccess: true,
+        req,
+      }))
+    } catch {
+      throw new APIError('Routepunt niet gevonden.', 404)
+    }
     if (String(relationID(point.route)) !== String(relationID(ride.route))) throw new APIError('Dit routepunt hoort niet bij deze rit.', 400)
     if (point.sequence <= ride.progress.lastRouteSequence) throw new APIError('De routevoortgang mag niet teruglopen of dubbel worden verwerkt.', 409)
-    const route = await loadRoute(req, relationNumber(ride.route, 'Route-id'), false)
+    if (!Number.isSafeInteger(point.distanceFromStartMeters) || point.distanceFromStartMeters < 0) {
+      throw new APIError('Dit routepunt heeft een ongeldige afstand.', 409)
+    }
+    const drivenDistanceMeters = Math.min(point.distanceFromStartMeters, ride.journey.quotedDistanceMeters)
+    if (drivenDistanceMeters < ride.progress.drivenDistanceMeters) throw new APIError('De gereden afstand mag niet teruglopen.', 409)
     const progress = calculateRideProgress({
-      distanceMeters: point.distanceFromStartMeters,
-      routeDistanceMeters: route.totalDistanceMeters,
-      routeDurationSeconds: route.estimatedDurationSeconds,
+      distanceMeters: drivenDistanceMeters,
+      routeDistanceMeters: ride.journey.quotedDistanceMeters,
+      routeDurationSeconds: ride.journey.quotedDurationSeconds,
       fareRules: ride.tariffSnapshot,
     })
     const updatedRide = asRide(await req.payload.update({
       collection: 'rides',
       id: ride.id,
-      data: { progress: { lastRouteSequence: point.sequence, drivenDistanceMeters: point.distanceFromStartMeters, ...progress } },
+      data: { progress: { lastRouteSequence: point.sequence, drivenDistanceMeters, ...progress } },
       overrideAccess: true,
       req,
     }))
@@ -355,7 +375,7 @@ const advanceRide = {
         idempotencyKey: eventKey,
         kind: 'progress',
         occurredAt: new Date().toISOString(),
-        drivenDistanceMeters: point.distanceFromStartMeters,
+        drivenDistanceMeters,
         elapsedSeconds: progress.elapsedSeconds,
         currentFareCents: progress.currentFareCents,
         estimatedFinalFareCents: progress.estimatedFinalFareCents,
@@ -375,10 +395,10 @@ const completeRide = {
     const user = currentUser(req)
     const ride = await ownRide(req, identifier(req.routeParams?.id, 'Rit-id'))
     if (!canOperateRide(user, ride)) throw new APIError('Alleen de toegewezen chauffeur of een medewerker mag een rit afronden.', 403)
-    if (ride.status !== 'active') throw new APIError('Alleen een actieve rit kan worden afgerond.', 409)
     const body = await jsonObject(req)
     const eventKey = idempotencyKey(body.idempotencyKey)
-    if (await existingEvent(req, eventKey)) return Response.json({ ride, idempotent: true })
+    if (await existingEvent(req, eventKey, ride, 'completed')) return Response.json({ ride, idempotent: true })
+    if (ride.status !== 'active') throw new APIError('Alleen een actieve rit kan worden afgerond.', 409)
     const finalPointResult = await req.payload.find({
       collection: 'route-points',
       where: { route: { equals: relationNumber(ride.route, 'Route-id') } },
@@ -392,22 +412,23 @@ const completeRide = {
     if (!finalPoint || ride.progress.lastRouteSequence !== finalPoint.sequence) {
       throw new APIError('De rit kan pas worden afgerond nadat het laatste routepunt is bereikt.', 409)
     }
-    const route = await loadRoute(req, relationNumber(ride.route, 'Route-id'), false)
-    const finalFare = calculateFare(route.totalDistanceMeters, route.estimatedDurationSeconds, ride.tariffSnapshot).totalCents
+    const distanceMeters = ride.journey.quotedDistanceMeters
+    const durationSeconds = ride.journey.quotedDurationSeconds
+    const finalFare = calculateFare(distanceMeters, durationSeconds, ride.tariffSnapshot).totalCents
     const updatedRide = asRide(await req.payload.update({
       collection: 'rides',
       id: ride.id,
       data: {
         status: 'completed',
         journey: { ...ride.journey, completedAt: new Date().toISOString() },
-        progress: { ...ride.progress, drivenDistanceMeters: route.totalDistanceMeters, elapsedSeconds: route.estimatedDurationSeconds, progressPercent: 100, currentFareCents: finalFare, estimatedFinalFareCents: finalFare, finalFareCents: finalFare },
+        progress: { ...ride.progress, drivenDistanceMeters: distanceMeters, elapsedSeconds: durationSeconds, progressPercent: 100, currentFareCents: finalFare, estimatedFinalFareCents: finalFare, finalFareCents: finalFare },
       },
       overrideAccess: true,
       req,
     }))
     await req.payload.create({
       collection: 'ride-events',
-      data: { ride: ride.id, routePoint: finalPoint.id, idempotencyKey: eventKey, kind: 'completed', occurredAt: new Date().toISOString(), drivenDistanceMeters: route.totalDistanceMeters, elapsedSeconds: route.estimatedDurationSeconds, currentFareCents: finalFare, estimatedFinalFareCents: finalFare },
+      data: { ride: ride.id, routePoint: finalPoint.id, idempotencyKey: eventKey, kind: 'completed', occurredAt: new Date().toISOString(), drivenDistanceMeters: distanceMeters, elapsedSeconds: durationSeconds, currentFareCents: finalFare, estimatedFinalFareCents: finalFare },
       overrideAccess: true,
       req,
     })
@@ -424,11 +445,11 @@ const cancelRide = {
     const ride = await ownRide(req, identifier(req.routeParams?.id, 'Rit-id'))
     const isPassenger = String(relationID(ride.passenger)) === String(user.id)
     if (!isPassenger && !canOperateRide(user, ride)) throw new APIError('Je mag deze rit niet annuleren.', 403)
-    if (ride.status !== 'quoted' && ride.status !== 'active') throw new APIError('Deze rit kan niet meer worden geannuleerd.', 409)
     const body = await jsonObject(req)
     const eventKey = idempotencyKey(body.idempotencyKey)
-    if (await existingEvent(req, eventKey)) return Response.json({ ride, idempotent: true })
-    const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 500) : undefined
+    if (await existingEvent(req, eventKey, ride, 'cancelled')) return Response.json({ ride, idempotent: true })
+    if (ride.status !== 'quoted' && ride.status !== 'active') throw new APIError('Deze rit kan niet meer worden geannuleerd.', 409)
+    const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 250) : undefined
     const updatedRide = asRide(await req.payload.update({
       collection: 'rides',
       id: ride.id,
