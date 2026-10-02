@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { api, distance, minutes, type RouteOption } from '@/lib/client-api'
+import { api, type RouteOption } from '@/lib/client-api'
 import { Steps, useSession } from './session'
 
 export function RoutePlanner() {
@@ -50,30 +50,26 @@ export function RoutePlanner() {
     return () => controller.abort()
   }, [user])
   const visible = routes.filter(route => (!favoritesOnly || favorites.includes(route.id)) && `${route.pickupLabel} ${route.destinationLabel}`.toLocaleLowerCase('nl').includes(search.toLocaleLowerCase('nl')))
-  const selectedRoute = visible.find(route => route.id === selected)
+  const selectedRoute = visible.find(route => route.id === selected) ?? visible[0]
   return <main className="screen">
-    <Steps current={1} /><p className="eyebrow">Op weg, met overzicht</p>
-    <h1 className="title">Waar wil je naartoe?</h1><p className="subtitle">Kies je route. Je ziet de tijd, afstand en volledige prijsopbouw voordat je vertrekt.</p>
-    {activeRide && <p className="notice success">Je hebt een actieve rit. <Link href={`/rit?id=${activeRide}`}>Verder met volgen →</Link></p>}
-    <div className="grid"><section>
-      <label className="field"><span className="field-label">Zoek vertrek of bestemming</span><input className="field-value" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Bijvoorbeeld Museumplein of Schiphol" /></label>
-      <div className="chips" style={{ marginTop: 14 }}><button className={`chip ${!favoritesOnly ? 'selected' : ''}`} onClick={() => setFavoritesOnly(false)}>Alle routes</button><button className={`chip ${favoritesOnly ? 'selected' : ''}`} onClick={() => setFavoritesOnly(true)}>★ Favorieten ({favorites.length})</button></div>
-      {loading && <p role="status" className="notice">Routes laden…</p>}
-      {error && <div className="notice error" role="alert">{error} <button className="text-button" onClick={() => setAttempt(attempt + 1)}>Opnieuw proberen</button></div>}
-      <div className="route-results">{visible.map(route => <div key={route.id} className={`route-option ${selected === route.id ? 'selected' : ''}`}>
-        <button className="route-select" onClick={() => setSelected(route.id)} aria-pressed={selected === route.id}>
-          <span className="route-dot" aria-hidden="true" /><span><strong>{route.destinationLabel}</strong><small>Vanaf {route.pickupLabel}</small><small>{distance(route.totalDistanceMeters)} · {minutes(route.estimatedDurationSeconds)}</small></span>
-        </button>
-        <button className={`favorite ${favorites.includes(route.id) ? 'saved' : ''}`} disabled={!storageReady} onClick={() => toggleFavorite(route.id)} aria-label={`${route.destinationLabel} ${favorites.includes(route.id) ? 'verwijderen uit' : 'toevoegen aan'} favorieten`} aria-pressed={favorites.includes(route.id)}>{favorites.includes(route.id) ? '★' : '☆'}</button>
-      </div>)}</div>
-      {!loading && !error && visible.length === 0 && <p className="empty">{favoritesOnly ? 'Nog geen passende favorieten. Bewaar een route met het sterretje.' : routes.length ? 'Geen route gevonden. Probeer een andere zoekterm.' : 'Er zijn nog geen routes beschikbaar.'}</p>}
-      <p className="muted">Je favorieten worden in deze browser bewaard.</p>
-    </section><aside className="panel tinted stack">
-      <p className="eyebrow">Goed om te weten</p><h2>Een helder begin.<br />Een transparante rit.</h2>
-      <p className="muted">Je prijs komt uit het actuele tarief. Tijdens je rit zie je hoeveel je hebt gereden en wat de rit kost.</p>
-      <div className="summary-row"><span>01</span><span>Kies een route</span></div><div className="summary-row"><span>02</span><span>Bekijk het voorstel</span></div><div className="summary-row"><span>03</span><span>Volg je rit</span></div>
-      <p className="muted">Beschikbare routes zijn demo-routes met een vast vertrekpunt.</p>
-    </aside></div>
-    <div className="btn-row">{selectedRoute ? <Link className="btn" href={`/voorstel?route=${selectedRoute.id}`}>Bekijk tijd en prijs voor {selectedRoute.destinationLabel} →</Link> : <button className="btn" disabled>Kies een beschikbare route</button>}</div>
+    <Steps current={1} />
+    <h1 className="title">Waar wil je naartoe?</h1>
+    <p className="subtitle">Voer een bestemming in en bekijk direct een indicatie van tijd en prijs.</p>
+    {activeRide && <p className="notice">Je hebt een actieve rit. <Link href={`/rit?id=${activeRide}`}>Rit volgen</Link></p>}
+    {loading && <p role="status" className="notice">Routes laden…</p>}
+    {error && <div className="notice error" role="alert">{error} <button className="text-button" onClick={() => setAttempt(attempt + 1)}>Opnieuw proberen</button></div>}
+    <label className="field"><span className="field-label">Vertrek</span><input className="field-value" value={selectedRoute?.pickupLabel ?? ''} placeholder="Selecteer een bestemming" readOnly /></label>
+    <label className="field"><span className="field-label">Bestemming</span><select className="field-value" value={selectedRoute?.id ?? ''} onChange={event => setSelected(Number(event.target.value))} disabled={loading || visible.length === 0}>
+      {!selectedRoute && <option value="">Geen bestemming beschikbaar</option>}
+      {visible.map(route => <option key={route.id} value={route.id}>{route.destinationLabel}</option>)}
+    </select></label>
+    {selectedRoute && <button className="text-button favorite-toggle" disabled={!storageReady} onClick={() => toggleFavorite(selectedRoute.id)} aria-pressed={favorites.includes(selectedRoute.id)}>{favorites.includes(selectedRoute.id) ? 'Verwijder uit favorieten' : 'Bewaar als favoriet'}</button>}
+    <details className="options"><summary>Zoeken en favorieten</summary>
+      <label className="field"><span className="field-label">Zoek vertrek of bestemming</span><input className="field-value" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Zoek een bestemming" /></label>
+      <div className="chips"><button className={`chip ${!favoritesOnly ? 'selected' : ''}`} aria-pressed={!favoritesOnly} onClick={() => setFavoritesOnly(false)}>Alle routes</button><button className={`chip ${favoritesOnly ? 'selected' : ''}`} aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(true)}>Favorieten ({favorites.length})</button></div>
+      <p className="muted">Favorieten worden in deze browser bewaard.</p>
+    </details>
+    {!loading && !error && visible.length === 0 && <p className="notice">{favoritesOnly ? 'Geen favorieten gevonden.' : 'Geen routes gevonden.'}</p>}
+    <div className="btn-row">{selectedRoute ? <Link className="btn" href={`/voorstel?route=${selectedRoute.id}`}>Bekijk tijd en prijs</Link> : <button className="btn" disabled>Kies een bestemming</button>}</div>
   </main>
 }

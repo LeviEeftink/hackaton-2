@@ -32,10 +32,6 @@ export function Navigation() {
     catch (e) { setError((e as Error).message); setBusy(false) }
   }
   return <>
-    <header className="app-header">
-      <Link href="/" className="wordmark"><span className="brand-mark" aria-hidden="true">↗</span> HitchTracker</Link>
-      <span className="header-note">Elke kilometer inzichtelijk.</span>
-    </header>
     <nav className="navigation" aria-label="Hoofdnavigatie">
       <Link href="/" aria-current={path === '/' ? 'page' : undefined}>Nieuwe rit</Link>
       {user && <Link href="/geschiedenis" aria-current={path === '/geschiedenis' ? 'page' : undefined}>Mijn ritten</Link>}
@@ -47,7 +43,7 @@ export function Navigation() {
 }
 
 export function Steps({ current }: { current: number }) {
-  return <ol className="flow-steps" aria-label="Ritstappen">{['Bestemming', 'Voorstel', 'Onderweg', 'Ritbewijs'].map((label, index) =>
-    <li key={label} className={index < current ? 'active' : ''} aria-current={index === current - 1 ? 'step' : undefined}><span>{String(index + 1).padStart(2, '0')}</span>{label}</li>,
+  return <ol className="steps" aria-label="Ritstappen">{['Bestemming', 'Voorstel', 'Onderweg', 'Ritbewijs'].map((label, index) =>
+    <li key={label} className={`step${index < current ? ' active' : ''}`} aria-current={index === current - 1 ? 'step' : undefined}><span className="sr-only">{label}</span></li>,
   )}</ol>
 }

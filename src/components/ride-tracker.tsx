@@ -56,22 +56,19 @@ export function RideTracker({ rideId }: { rideId: number }) {
     finally { inFlight.current = false; setBusy(false) }
   }
   return <main className="screen"><Steps current={3} />
-    <p className="eyebrow">Inzicht onderweg</p><h1 className="title">{ride ? `Naar ${ride.destinationLabel}` : 'Volg je rit.'}</h1>
-    <p className="subtitle">Je voortgang en prijs worden elke vijf seconden bijgewerkt.</p>
+    <h1 className="title">{ride ? `Naar: ${ride.destinationLabel}` : 'Rit volgen'}</h1>
     {loading ? <p className="notice" role="status">Account controleren…</p> : !user ? <Link className="btn" href={`/account?next=${encodeURIComponent(`/rit?id=${rideId}`)}`}>Inloggen om deze rit te volgen</Link> : !Number.isSafeInteger(rideId) || rideId <= 0 ? <p className="notice error" role="alert">Kies een rit via <Link href="/geschiedenis">Mijn ritten</Link>.</p> : !tracking && !error ? <p className="notice" role="status">Ritgegevens laden…</p> : null}
     {error && <div className="notice error" role="alert">{error} <button className="text-button" onClick={() => setRefresh(value => value + 1)}>Opnieuw laden</button></div>}
     {tracking && ride && <>
       <div className="card-heading"><span className={`badge ${ride.status}`}>{statusLabel(ride.status)}</span><span className="muted">{ride.reference}</span></div>
-      <div className="grid"><section className="panel tinted">
-        <p className="quote-label">Huidige ritprijs</p><p className="quote-price" aria-live="polite">{money(ride.progress.currentFareCents, ride.currency)}</p>
         <div className="progress" role="progressbar" aria-label="Ritvoortgang" aria-valuenow={ride.progress.progressPercent} aria-valuemin={0} aria-valuemax={100}><div className="progress-fill" style={{ width: `${ride.progress.progressPercent}%` }} /></div>
         <div className="progress-labels"><span>{distance(ride.progress.drivenDistanceMeters)} gereden</span><span>{Math.round(ride.progress.progressPercent)}%</span></div>
-        <div className="summary-list"><div className="summary-row"><span>Geschatte eindprijs</span><span>{money(ride.progress.estimatedFinalFareCents, ride.currency)}</span></div><div className="summary-row"><span>Rittijd</span><span>{minutes(ride.progress.elapsedSeconds)}</span></div><div className="summary-row"><span>Volgend routepunt</span><span>{nextPoint?.label ?? 'Bestemming bereikt'}</span></div></div>
+        <div className="price-list"><div className="price-row"><span className="price-row-label">Huidige prijs</span><span className="price-row-value" aria-live="polite">{money(ride.progress.currentFareCents, ride.currency)}</span></div><div className="price-row"><span className="price-row-label">Eindprijs ca.</span><span className="price-row-value small">{money(ride.progress.estimatedFinalFareCents, ride.currency)}</span></div><div className="price-row"><span>Rittijd</span><span>{minutes(ride.progress.elapsedSeconds)}</span></div></div>
         <button className="text-button" onClick={() => setRefresh(value => value + 1)}>Nu verversen</button>
-      </section><section className="panel"><h2>Je route</h2><ol className="timeline">{tracking.routePoints.map(point => <li key={point.id} className={point.passed ? 'passed' : ''}><strong>{point.label}</strong><small>{distance(point.distanceFromStartMeters)} vanaf vertrek{point.passed ? ' · Gepasseerd' : ''}</small></li>)}</ol></section></div>
+      <details className="options"><summary>Routepunten</summary><ol className="timeline">{tracking.routePoints.map(point => <li key={point.id} className={point.passed ? 'passed' : ''}><strong>{point.label}</strong><small>{distance(point.distanceFromStartMeters)} vanaf vertrek{point.passed ? ' · Gepasseerd' : ''}</small></li>)}</ol></details>
       {ride.status === 'active' && <div className="btn-row">
-        {canOperate && (nextPoint ? <button className="btn" onClick={() => act('advance')} disabled={busy}>Routepunt bereikt: {nextPoint.label}</button> : <button className="btn" onClick={() => act('complete')} disabled={busy}>Rit afronden →</button>)}
-        {!canOperate && <p className="notice">Je chauffeur verwerkt de routepunten en rondt je rit bij aankomst af.</p>}
+        {canOperate && (nextPoint ? <button className="btn" onClick={() => act('advance')} disabled={busy}>Routepunt bereikt: {nextPoint.label}</button> : <button className="btn" onClick={() => act('complete')} disabled={busy}>Rit afronden</button>)}
+        {!canOperate && <p className="muted">De chauffeur rondt je rit af.</p>}
         {cancelOpen ? <div className="panel stack"><label className="field"><span className="field-label">Reden voor annulering (optioneel)</span><textarea className="field-value" rows={3} maxLength={250} value={reason} onChange={event => setReason(event.target.value)} /></label><button className="btn btn-danger" onClick={() => act('cancel')} disabled={busy}>{busy ? 'Bezig…' : 'Annulering bevestigen'}</button><button className="text-button" onClick={() => setCancelOpen(false)} disabled={busy}>Rit behouden</button></div> : <button className="text-button" onClick={() => setCancelOpen(true)} disabled={busy}>Rit annuleren</button>}
       </div>}
     </>}

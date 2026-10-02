@@ -60,23 +60,20 @@ export function DriverDashboard() {
   const rides = result && result.userId === userId && result.role === role ? result : null
 
   return <main className="screen">
-    <p className="eyebrow">Ritbeheer</p>
-    <h1 className="title">Klaar voor de volgende rit.</h1>
-    <p className="subtitle">{role === 'driver' ? 'Bekijk jouw toegewezen actieve ritten en werk onderweg de voortgang bij.' : 'Bekijk actieve ritten en open een rit om de voortgang te beheren.'}</p>
+    <h1 className="title">Actieve ritten</h1>
 
     {sessionLoading ? <p className="notice" role="status">Account controleren…</p> : !user ? <section className="panel stack">
       <h2>Log in als chauffeur of medewerker</h2>
-      <p className="muted">Je account bepaalt welke ritten je kunt bekijken en bijwerken.</p>
       <Link className="btn" href="/account?next=%2Fchauffeur">Inloggen</Link>
     </section> : !canManage ? <section className="panel stack">
-      <h2>Bekijk je rit als passagier</h2>
-      <p className="muted">Ritbeheer is beschikbaar voor chauffeurs en medewerkers. Volg je eigen rit via Mijn ritten of start een nieuwe rit.</p>
+      <h2>Ritbeheer voor chauffeurs en medewerkers</h2>
+      <p className="muted">Je eigen ritten staan in Mijn ritten.</p>
       <Link className="btn" href="/geschiedenis">Mijn ritten</Link>
       <Link className="btn btn-outline" href="/">Nieuwe rit</Link>
     </section> : <div className="stack">
-      <section className="panel tinted">
-        <h2>Van boeking naar vertrek</h2>
-        <p className="muted">Een passagier start de rit vanuit het ritvoorstel. Een medewerker wijst daarna in het beheer een chauffeur toe. Chauffeurs zien hier hun toegewezen ritten; medewerkers kunnen alle actieve ritten openen en voortgang bijwerken.</p>
+      <section className="panel">
+        <h2>Chauffeur toewijzen</h2>
+        <p className="muted">{role === 'driver' ? 'Hier staan de actieve ritten die een medewerker aan je heeft toegewezen.' : 'Wijs in het beheer een chauffeur toe aan een gestarte rit.'}</p>
         {(role === 'operator' || role === 'admin') && <Link className="text-button" href="/admin/collections/rides">Chauffeur toewijzen in beheer</Link>}
       </section>
 
@@ -87,15 +84,15 @@ export function DriverDashboard() {
       {error && <div className="notice error" role="alert">{error} <button className="text-button" onClick={() => setAttempt((current) => current + 1)} disabled={pending}>Opnieuw proberen</button></div>}
       {!rides && !error && <p className="notice" role="status">Actieve ritten ophalen…</p>}
       {rides && rides.docs.length === 0 && <div className="empty">
-        <h2>Er staan geen actieve ritten klaar</h2>
-        <p>{role === 'driver' ? 'Zodra een medewerker een actieve rit aan je toewijst, verschijnt die hier. Ververs om nieuwe opdrachten op te halen.' : 'Laat een passagier eerst een rit starten. Ververs daarna om de boeking te bekijken.'}</p>
+        <h2>Geen actieve ritten</h2>
+        <p>{role === 'driver' ? 'Ververs om toegewezen ritten op te halen.' : 'Een rit verschijnt hier zodra de passagier deze start.'}</p>
       </div>}
       {rides && rides.docs.length > 0 && <section className="stack" aria-label="Actieve ritten" aria-busy={pending}>
         {rides.docs.map((ride) => {
           const progress = Math.min(100, Math.max(0, ride.progress.progressPercent))
           const currency = ride.tariffSnapshot.currency
           return <Link key={ride.id} href={`/rit?id=${ride.id}`} className="panel history-card" aria-label={`Open rit ${ride.reference}: ${ride.journey.pickupLabel} naar ${ride.journey.destinationLabel}`}>
-            <div className="card-heading"><span className="eyebrow">{ride.reference}</span><span className="badge">Onderweg</span></div>
+            <div className="card-heading"><span className="muted">{ride.reference}</span><span className="badge">Onderweg</span></div>
             <h2>{ride.journey.pickupLabel} → {ride.journey.destinationLabel}</h2>
             <div className="progress" role="progressbar" aria-label="Ritvoortgang" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
               <div className="progress-fill" style={{ width: `${progress}%` }} />
@@ -103,7 +100,7 @@ export function DriverDashboard() {
             <div className="progress-labels"><span>{progress}% bereikt</span><span>{distance(ride.progress.drivenDistanceMeters)} gereden</span></div>
             <div className="summary-row"><span>Huidige prijs</span><strong>{money(ride.progress.currentFareCents, currency)}</strong></div>
             <div className="summary-row"><span>Geschatte eindprijs</span><strong>{money(ride.progress.estimatedFinalFareCents, currency)}</strong></div>
-            <p className="muted">Open rit en werk de voortgang bij →</p>
+            <p className="muted">Voortgang bijwerken</p>
           </Link>
         })}
       </section>}

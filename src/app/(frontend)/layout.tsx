@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 
 import '../globals.css'
 import { Navigation, SessionProvider } from '@/components/session'
@@ -17,7 +18,7 @@ export const viewport: Viewport = {
 export default function FrontendLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="nl"><body><SessionProvider>
-      <div className="phone"><Navigation />{children}<footer className="app-footer">HitchTracker · Transparant van vertrek tot aankomst</footer></div>
+      <div className="phone"><header className="app-header"><Link className="brand" href="/">HitchTracker</Link></header>{children}<Navigation /></div>
     </SessionProvider></body></html>
   )
 }

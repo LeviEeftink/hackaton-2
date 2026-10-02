@@ -27,8 +27,7 @@ export function Account({ next }: { next: string | string[] }) {
     finally { setBusy(false) }
   }
   return <main className="screen narrow">
-    <p className="eyebrow">Jouw account</p><h1 className="title">{register ? 'Welkom aan boord.' : 'Goed je weer te zien.'}</h1>
-    <p className="subtitle">Bewaar je ritten en volg onderweg de voortgang en prijs.</p>
+    <h1 className="title">{register ? 'Account maken' : 'Inloggen'}</h1>
     {user ? <div className="panel"><p>Je bent ingelogd als <strong>{user.name}</strong>.</p><Link className="btn" href={destination}>Verder</Link></div> : <>
       <form onSubmit={submit} className="stack">
         {register && <label className="field"><span className="field-label">Naam</span><input className="field-value" name="name" autoComplete="name" minLength={2} maxLength={120} required /></label>}
@@ -37,7 +36,7 @@ export function Account({ next }: { next: string | string[] }) {
         {error && <p className="notice error" role="alert">{error}</p>}
         <button className="btn" disabled={busy}>{busy ? 'Even geduld…' : register ? 'Account maken' : 'Inloggen'}</button>
       </form>
-      <button className="text-button account-switch" onClick={() => { setRegister(!register); setError('') }}>{register ? 'Al een account? Inloggen' : 'Nieuw hier? Maak een account'}</button>
+      <button className="text-button account-switch" onClick={() => { setRegister(!register); setError('') }}>{register ? 'Al een account? Inloggen' : 'Account maken'}</button>
     </>}
   </main>
 }

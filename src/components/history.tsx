@@ -68,12 +68,10 @@ export function History() {
 
   const data = current?.data
   return <main className="screen">
-    <p className="eyebrow">Jouw overzicht</p>
-    <h1 className="title">Elke rit, bewaard.</h1>
-    <p className="subtitle">Volg je lopende ritten en bekijk achteraf de route, prijs en het ritbewijs.</p>
+    <h1 className="title">Mijn ritten</h1>
 
     {sessionLoading ? <p className="notice" role="status">Account controleren…</p> : !user ?
-      <section className="panel stack"><h2>Log in om je ritten te bekijken</h2><p className="muted">Je ritgeschiedenis is gekoppeld aan je account.</p><Link className="btn" href="/account?next=%2Fgeschiedenis">Inloggen</Link></section> : <>
+      <section className="panel stack"><h2>Log in om je ritten te bekijken</h2><Link className="btn" href="/account?next=%2Fgeschiedenis">Inloggen</Link></section> : <>
         <div className="chips" aria-label="Filter op ritstatus">
           {filters.map((filter) => <button key={filter.value} type="button" className={`chip${status === filter.value ? ' selected' : ''}`} aria-pressed={status === filter.value} onClick={() => { setStatus(filter.value); setPage(1) }}>{filter.label}</button>)}
         </div>
@@ -82,14 +80,14 @@ export function History() {
         {current?.error && <div className="notice error" role="alert">{current.error} <button type="button" className="text-button" onClick={() => setAttempt(attempt + 1)}>Opnieuw proberen</button></div>}
         {data && <>
           <p className="muted" role="status">{data.totalDocs} {data.totalDocs === 1 ? 'rit' : 'ritten'}{status ? ` · ${filters.find((filter) => filter.value === status)?.label}` : ''}</p>
-          {data.docs.length === 0 ? <section className="empty"><h2>{status ? 'Geen ritten met deze status' : 'Je eerste rit begint hier'}</h2><p>{status ? 'Kies een andere filter om je overige ritten te bekijken.' : 'Kies een bestemming en start je rit. Hier vind je daarna je overzicht.'}</p><Link href="/">Nieuwe rit plannen →</Link></section> :
+          {data.docs.length === 0 ? <section className="empty"><h2>{status ? 'Geen ritten met deze status' : 'Nog geen ritten'}</h2>{status && <p>Kies een andere filter.</p>}<Link href="/">Nieuwe rit plannen</Link></section> :
             <div className="stack">{data.docs.map((ride) => <Link key={ride.id} className="panel history-card" href={`${ride.status === 'completed' || ride.status === 'cancelled' ? '/eind' : '/rit'}?id=${ride.id}`}>
               <div className="card-heading"><span className="muted">{ride.reference}</span><span className={`badge${ride.status === 'cancelled' ? ' cancelled' : ''}`}>{statusLabel(ride.status)}</span></div>
               <strong>{ride.pickupLabel} → {ride.destinationLabel}</strong>
               <p className="muted">{dateTime(ride.completedAt || ride.cancelledAt || ride.startedAt || ride.createdAt)}</p>
               <p className="muted">{distance(ride.progress.drivenDistanceMeters)} · {minutes(ride.progress.elapsedSeconds)}</p>
               <p>{priceLabel(ride)}</p>
-              <p className="muted">{ride.status === 'active' || ride.status === 'quoted' ? 'Rit volgen →' : 'Rit bekijken →'}</p>
+              <p className="muted">{ride.status === 'active' || ride.status === 'quoted' ? 'Rit volgen' : 'Rit bekijken'}</p>
             </Link>)}</div>}
           {data.totalPages > 1 && <nav className="pagination" aria-label="Pagina’s van ritgeschiedenis">
             <button type="button" className="btn btn-outline" disabled={!data.hasPrevPage} onClick={() => setPage(data.prevPage ?? Math.max(1, page - 1))}>Vorige</button>
